@@ -7,6 +7,7 @@
 // @grant        none
 // @author       175cc
 // @license      MIT
+// @namespace    https://github.com/175cc/Douyin_Live_page.git
 // @downloadURL  https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%89.user.js
 // @updateURL    https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%89.meta.js
 // ==/UserScript==
