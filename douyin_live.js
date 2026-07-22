@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.5
+// @version      3.6
 // @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室
 // @match        *://live.douyin.com/*
 // @grant        none
