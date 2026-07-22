@@ -89,15 +89,15 @@
       }
     });
 
-    // 2. 删除弹窗拦截
-    waitForElement('.dylive-tooltip, [class*="tooltip"]', 30000).then(
-      (tooltip) => {
-        if (tooltip) {
-          tooltip.remove();
-          console.log("[成功] 删除弹窗");
-        }
-      },
-    );
+    // 2. 删除弹窗拦截   有bug，导致某页面误封
+    // waitForElement('.dylive-tooltip, [class*="tooltip"]', 30000).then(
+    //   (tooltip) => {
+    //     if (tooltip) {
+    //       tooltip.remove();
+    //       console.log("[成功] 删除弹窗");
+    //     }
+    //   },
+    // );
 
     // 3. 隐藏底部礼物栏
     waitForElement(
