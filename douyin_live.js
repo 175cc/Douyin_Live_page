@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.6
-// @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室
+// @version      3.7
+// @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室，带2分钟自动释放性能的弹窗拦截
 // @match        *://live.douyin.com/*
 // @grant        none
 // @author       175cc
@@ -26,7 +26,7 @@
     while (Date.now() - startTime < timeout) {
       const el = document.querySelector(selector);
       if (el) return el;
-      await sleep(300);
+      await sleep(400);
     }
     console.warn(`[超时] 未找到元素: ${selector}`);
     return null;
@@ -78,7 +78,51 @@
     });
   }
 
-  // --- 并行执行任务（无需等待悬停，互不干扰） ---
+  // --- 安全弹窗与引导处理逻辑 ---
+  function setupPopupCleaner() {
+    // 1. 通过安全 CSS 隐藏纯气泡提示，避免删除 DOM 节点导致页面卡死
+    const hideStyle = document.createElement("style");
+    hideStyle.textContent = `
+      .dylive-tooltip,
+      [class*="guide-tooltip"],
+      [class*="guideTooltip"],
+      [class*="login-guide-container"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(hideStyle);
+
+    // 2. 监听并自动触发关闭按钮（平滑自动点击关闭）
+    const closeSelectors = [
+      ".dy-account-close",
+      '[class*="login-guide"] [class*="close"]',
+      '[class*="pop-close"]',
+    ];
+
+    const observer = new MutationObserver(() => {
+      closeSelectors.forEach((selector) => {
+        const closeBtn = document.querySelector(selector);
+        if (closeBtn && closeBtn.offsetParent !== null) {
+          closeBtn.click();
+          console.log(`[自动拦截] 已安全关闭弹窗: ${selector}`);
+        }
+      });
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // ⏱️ 方案A：运行 5 分钟（300,000 毫秒）后自动停止监听，彻底释放主线程 CPU 性能
+    setTimeout(() => {
+      observer.disconnect();
+      console.log(
+        "[自动拦截] 进房初始阶段完成，已自动断开 DOM 监听器以优化性能。",
+      );
+    }, 300000);
+  }
+
+  // --- 并行执行任务（界面静态组件隐藏） ---
 
   async function removeUIElements() {
     // 1. 初始化自动关闭聊天室
@@ -89,17 +133,7 @@
       }
     });
 
-    // 2. 删除弹窗拦截   有bug，导致某页面误封
-    // waitForElement('.dylive-tooltip, [class*="tooltip"]', 30000).then(
-    //   (tooltip) => {
-    //     if (tooltip) {
-    //       tooltip.remove();
-    //       console.log("[成功] 删除弹窗");
-    //     }
-    //   },
-    // );
-
-    // 3. 隐藏底部礼物栏
+    // 2. 隐藏底部礼物栏
     waitForElement(
       '[data-e2e="gift-panel"], .YWoVbeaa.NP47LiqA.klDKYUkp',
       30000,
@@ -186,6 +220,9 @@
 
     // 注册键盘切换快捷键
     setupShortcuts();
+
+    // 启用带定时释放功能的安全弹窗/引导拦截机制
+    setupPopupCleaner();
 
     // 并行任务
     removeUIElements();
