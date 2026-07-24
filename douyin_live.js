@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.7
+// @version      3.8
 // @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室，带2分钟自动释放性能的弹窗拦截
 // @match        *://live.douyin.com/*
 // @grant        none
@@ -126,8 +126,9 @@
 
   async function removeUIElements() {
     // 1. 初始化自动关闭聊天室
-    waitForElement(".chatroom_close").then((btn) => {
+    waitForElement(".chatroom_close").then(async (btn) => {
       if (btn) {
+        await sleep(1000);
         btn.click();
         console.log("[成功] 初始化关闭聊天室");
       }
@@ -165,7 +166,7 @@
       await sleep(500);
     }
 
-    // 2. 关闭礼物特效
+    // 2. 保持礼物特效为开启状态（如已关闭则打开）
     const giftPanel = await waitForElement('[data-e2e="gift-setting"]');
     if (giftPanel) {
       triggerHover(giftPanel, true);
@@ -176,8 +177,16 @@
         document.querySelector('[data-e2e="effect-switch"] > div');
 
       if (effectTarget) {
-        effectTarget.click();
-        console.log("[成功] 屏蔽礼物特效");
+        // 检测礼物特效状态：开启状态包含 SpsbqNUm 或 gDrxzyfK class，关闭状态没有
+        const isEnabled =
+          effectTarget.classList.contains("gDrxzyfK") ||
+          effectTarget.parentElement?.classList.contains("SpsbqNUm");
+        if (!isEnabled) {
+          effectTarget.click();
+          console.log("[成功] 已打开礼物特效");
+        } else {
+          console.log("[跳过] 礼物特效已处于开启状态");
+        }
       } else {
         console.warn("[失败] 未找到礼物特效开关的内层元素");
       }
@@ -204,8 +213,16 @@
         if (targetSpan && targetSpan.nextElementSibling) {
           const realSwitch = targetSpan.nextElementSibling.querySelector("div");
           if (realSwitch) {
-            realSwitch.click();
-            console.log(`[成功] 关闭弹幕选项: ${type}`);
+            // 检测开关状态：开启状态包含 SpsbqNUm 或 gDrxzyfK class，关闭状态没有这些 class
+            const isEnabled =
+              realSwitch.classList.contains("SpsbqNUm") ||
+              realSwitch.classList.contains("gDrxzyfK");
+            if (isEnabled) {
+              realSwitch.click();
+              console.log(`[成功] 关闭弹幕选项: ${type}`);
+            } else {
+              console.log(`[跳过] 弹幕选项 ${type} 已处于关闭状态`);
+            }
           }
         }
       });
