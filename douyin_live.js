@@ -86,13 +86,27 @@
       .dylive-tooltip,
       [class*="guide-tooltip"],
       [class*="guideTooltip"],
-      [class*="login-guide-container"] {
+      [class*="login-guide-container"],
+      .S_kkDiOx {
         display: none !important;
         visibility: hidden !important;
         pointer-events: none !important;
       }
     `;
     (document.head || document.documentElement).appendChild(hideStyle);
+
+    // 1.5 特殊弹窗监听（2分钟超时）
+    const specialPopupMonitor = setInterval(() => {
+      const popup = document.querySelector(".S_kkDiOx");
+      if (popup) {
+        console.log("[自动拦截] 检测到购物车弹窗 S_kkDiOx，已隐藏");
+      }
+    }, 1000);
+
+    setTimeout(() => {
+      clearInterval(specialPopupMonitor);
+      console.log("[自动拦截] 2分钟超时，已停止检测购物车弹窗 S_kkDiOx");
+    }, 120000);
 
     // 2. 监听并自动触发关闭按钮（平滑自动点击关闭）
     const closeSelectors = [
