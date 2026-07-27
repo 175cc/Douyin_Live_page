@@ -4,6 +4,7 @@
 // @version      3.9
 // @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室，带2分钟自动释放性能的弹窗拦截
 // @match        *://live.douyin.com/*
+// @run-at       document-start
 // @grant        none
 // @author       175cc
 // @license      MIT
@@ -55,6 +56,9 @@
 
       // 监听 C 键 (忽略大小写)
       if (e.key.toLowerCase() === "c") {
+        // 过滤 Ctrl+C, Cmd+C, Alt+C 等组合键，防止误触
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
         const closeBtn = document.querySelector(".chatroom_close");
         // 兼容支持语义化 class .chat_room_fold 与哈希 class .Z6P6fFhc
         const openBtn = document.querySelector(".chat_room_fold, .Z6P6fFhc");
@@ -101,7 +105,8 @@
     const specialPopupMonitor = setInterval(() => {
       const popup = document.querySelector(".S_kkDiOx");
       if (popup) {
-        console.log("[自动拦截] 检测到购物车弹窗 S_kkDiOx，已隐藏");
+        popup.remove(); // 彻底从 DOM 中移除，避免重复轮询触发
+        console.log("[自动拦截] 检测到购物车弹窗 S_kkDiOx，已彻底移除");
       }
     }, 1000);
 
@@ -150,7 +155,7 @@
       }
     });
 
-    // 2. 隐藏底部礼物栏
+    // 2. 隐藏底部礼物栏  （此项暂保留）
     waitForElement(
       '[data-e2e="gift-panel"], .YWoVbeaa.NP47LiqA.klDKYUkp',
       30000,
@@ -168,18 +173,24 @@
     // 1. 切换画质
     const qualityMenu = await waitForElement('[data-e2e="quality-selector"]');
     if (qualityMenu) {
-      triggerHover(qualityMenu, true);
-      await sleep(500);
-      const options = Array.from(
-        qualityMenu.querySelectorAll("li, div, span, p"),
-      );
-      const target = options.find((el) => el.textContent.trim() === "原画");
-      if (target) {
-        target.click();
-        console.log("[成功] 已选择画质: 原画");
+      // 如果当前已经是原画，跳过悬停菜单交互
+      if (qualityMenu.textContent.includes("原画")) {
+        console.log("[跳过] 当前画质已经是: 原画");
+      } else {
+        triggerHover(qualityMenu, true);
+        await sleep(500);
+
+        const options = Array.from(
+          qualityMenu.querySelectorAll("li, div, span, p"),
+        );
+        const target = options.find((el) => el.textContent.trim() === "原画");
+        if (target) {
+          target.click();
+          console.log("[成功] 已选择画质: 原画");
+        }
+        triggerHover(qualityMenu, false);
+        await sleep(500);
       }
-      triggerHover(qualityMenu, false);
-      await sleep(500);
     }
 
     // 2. 保持礼物特效为开启状态（如已关闭则打开）
