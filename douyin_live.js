@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.9
-// @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室，带2分钟自动释放性能的弹窗拦截
+// @version      3.9.1
+// @description  延时执行一次：增加C键开关聊天室，屏蔽礼物特效、购物车、
 // @match        *://live.douyin.com/*
 // @run-at       document-start
 // @grant        none
@@ -173,8 +173,13 @@
     // 1. 切换画质
     const qualityMenu = await waitForElement('[data-e2e="quality-selector"]');
     if (qualityMenu) {
-      // 如果当前已经是原画，跳过悬停菜单交互
-      if (qualityMenu.textContent.includes("原画")) {
+      // 用 data-e2e="quality" 读取当前画质文案
+      const qualityLabel = document.querySelector('[data-e2e="quality"]');
+      const currentQuality = qualityLabel
+        ? qualityLabel.textContent.trim()
+        : "";
+
+      if (currentQuality === "原画") {
         console.log("[跳过] 当前画质已经是: 原画");
       } else {
         triggerHover(qualityMenu, true);
