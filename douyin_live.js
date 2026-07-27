@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.8
+// @version      3.9
 // @description  延时执行一次：关闭弹幕、礼物、聊天窗口，并开启原画，增加C键开关聊天室，带2分钟自动释放性能的弹窗拦截
 // @match        *://live.douyin.com/*
 // @grant        none
@@ -80,19 +80,21 @@
 
   // --- 安全弹窗与引导处理逻辑 ---
   function setupPopupCleaner() {
-    // 1. 通过安全 CSS 隐藏纯气泡提示，避免删除 DOM 节点导致页面卡死
+    // 1. 通过安全 CSS 隐藏纯气泡提示及底部礼物栏（使用 !important 防止全屏切换时被 React 还原）
     const hideStyle = document.createElement("style");
     hideStyle.textContent = `
-      .dylive-tooltip,
-      [class*="guide-tooltip"],
-      [class*="guideTooltip"],
-      [class*="login-guide-container"],
-      .S_kkDiOx {
-        display: none !important;
-        visibility: hidden !important;
-        pointer-events: none !important;
-      }
-    `;
+    .dylive-tooltip,
+    [class*="guide-tooltip"],
+    [class*="guideTooltip"],
+    [class*="login-guide-container"],
+    .S_kkDiOx,
+    [data-e2e="gift-panel"],
+    .YWoVbeaa.NP47LiqA.klDKYUkp {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+  `;
     (document.head || document.documentElement).appendChild(hideStyle);
 
     // 1.5 特殊弹窗监听（2分钟超时）
