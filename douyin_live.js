@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.9.1
-// @description  延时执行一次：增加C键开关聊天室，屏蔽礼物特效、购物车、
+// @version      3.9.3
+// @description  C键开关聊天室，自动原画，关闭弹幕/礼物，2分钟性能释放，防后台标签页卡顿/黑屏
 // @match        *://live.douyin.com/*
 // @run-at       document-start
 // @grant        none
@@ -17,19 +17,28 @@
   "use strict";
 
   // --- 通用工具函数 ---
-
-  // 延迟函数
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  // 防抖函数
+  const createDebouncer = (func, wait) => {
+    let timeout;
+    const debounced = function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+    debounced.cancel = () => clearTimeout(timeout);
+    return debounced;
+  };
+
   // 轮询等待元素出现
-  const waitForElement = async (selector, timeout = 15000) => {
+  const waitForElement = async (selector, timeout = 8000) => {
     const startTime = Date.now();
     while (Date.now() - startTime < timeout) {
       const el = document.querySelector(selector);
       if (el) return el;
       await sleep(400);
     }
-    console.warn(`[超时] 未找到元素: ${selector}`);
+    console.warn(`[未找到/超时] 元素: ${selector}`);
     return null;
   };
 
@@ -43,7 +52,7 @@
     );
   };
 
-  // --- 快捷键功能 (C键 开/关 切换聊天室) ---
+  // --- 1. 快捷键功能 (仅保留 C 键 开/关 切换聊天室) ---
   function setupShortcuts() {
     document.addEventListener("keydown", (e) => {
       // 避免输入框打字误触
@@ -56,25 +65,18 @@
 
       // 监听 C 键 (忽略大小写)
       if (e.key.toLowerCase() === "c") {
-        // 过滤 Ctrl+C, Cmd+C, Alt+C 等组合键，防止误触
         if (e.ctrlKey || e.metaKey || e.altKey) return;
 
         const closeBtn = document.querySelector(".chatroom_close");
-        // 兼容支持语义化 class .chat_room_fold 与哈希 class .Z6P6fFhc
         const openBtn = document.querySelector(".chat_room_fold, .Z6P6fFhc");
 
-        // 如果关闭按钮存在且处于显示状态 -> 关闭聊天室
         if (closeBtn && closeBtn.offsetParent !== null) {
           closeBtn.click();
           console.log("[快捷键 C] 已关闭聊天室");
-        }
-        // 否则如果展开按钮存在 -> 重新打开聊天室
-        else if (openBtn) {
+        } else if (openBtn) {
           openBtn.click();
           console.log("[快捷键 C] 已重新展开聊天室");
-        }
-        // 保底分支
-        else if (closeBtn) {
+        } else if (closeBtn) {
           closeBtn.click();
           console.log("[快捷键 C] 执行关闭聊天室");
         }
@@ -82,83 +84,105 @@
     });
   }
 
-  // --- 安全弹窗与引导处理逻辑 ---
-  function setupPopupCleaner() {
-    // 1. 通过安全 CSS 隐藏纯气泡提示及底部礼物栏（使用 !important 防止全屏切换时被 React 还原）
-    const hideStyle = document.createElement("style");
-    hideStyle.textContent = `
-    .dylive-tooltip,
-    [class*="guide-tooltip"],
-    [class*="guideTooltip"],
-    [class*="login-guide-container"],
-    .S_kkDiOx,
-    [data-e2e="gift-panel"],
-    .YWoVbeaa.NP47LiqA.klDKYUkp {
-      display: none !important;
-      visibility: hidden !important;
-      pointer-events: none !important;
-    }
-  `;
-    (document.head || document.documentElement).appendChild(hideStyle);
-
-    // 1.5 特殊弹窗监听（2分钟超时）
-    const specialPopupMonitor = setInterval(() => {
-      const popup = document.querySelector(".S_kkDiOx");
-      if (popup) {
-        popup.remove(); // 彻底从 DOM 中移除，避免重复轮询触发
-        console.log("[自动拦截] 检测到购物车弹窗 S_kkDiOx，已彻底移除");
+  // --- 2. 切后台防卡顿/黑屏恢复机制 --- 此项待考究 ---
+  function setupBackgroundRecovery() {
+    document.addEventListener("visibilitychange", () => {
+      // 当从其他标签页切回抖音直播时
+      if (document.visibilityState === "visible") {
+        const video = document.querySelector("video");
+        if (video) {
+          // 如果视频处于暂停状态且未结束，尝试恢复播放
+          if (video.paused && !video.ended) {
+            video.play().catch(() => {});
+          }
+          // 微调画面渲染，唤醒渲染引擎恢复高帧率
+          video.style.transform = "translateZ(0)";
+          console.log("[流畅保障] 已从后台切回，唤醒视频渲染层");
+        }
       }
-    }, 1000);
+    });
+  }
 
-    setTimeout(() => {
-      clearInterval(specialPopupMonitor);
-      console.log("[自动拦截] 2分钟超时，已停止检测购物车弹窗 S_kkDiOx");
-    }, 120000);
+  // --- 3. 安全弹窗与引导处理逻辑 ---
+  function setupPopupCleaner() {
+    // 安全注入 CSS 隐藏礼物栏与弹窗
+    const injectStyle = () => {
+      const hideStyle = document.createElement("style");
+      hideStyle.textContent = `
+        .dylive-tooltip,
+        [class*="guide-tooltip"],
+        [class*="guideTooltip"],
+        [class*="login-guide-container"],
+        .S_kkDiOx,
+        [data-e2e="gift-panel"],
+        .YWoVbeaa.NP47LiqA.klDKYUkp {
+          display: none !important;
+          visibility: hidden !important;
+          pointer-events: none !important;
+        }
+      `;
+      (document.head || document.documentElement).appendChild(hideStyle);
+    };
 
-    // 2. 监听并自动触发关闭按钮（平滑自动点击关闭）
+    if (document.head || document.documentElement) {
+      injectStyle();
+    } else {
+      document.addEventListener("DOMContentLoaded", injectStyle);
+    }
+
     const closeSelectors = [
       ".dy-account-close",
       '[class*="login-guide"] [class*="close"]',
       '[class*="pop-close"]',
+      ".S_kkDiOx",
     ];
 
-    const observer = new MutationObserver(() => {
+    const cleanPopups = createDebouncer(() => {
       closeSelectors.forEach((selector) => {
-        const closeBtn = document.querySelector(selector);
-        if (closeBtn && closeBtn.offsetParent !== null) {
-          closeBtn.click();
-          console.log(`[自动拦截] 已安全关闭弹窗: ${selector}`);
+        const el = document.querySelector(selector);
+        if (el) {
+          if (selector === ".S_kkDiOx") {
+            el.remove();
+          } else if (el.offsetParent !== null) {
+            el.click();
+          }
         }
       });
-    });
+    }, 300);
 
-    observer.observe(document.body, { childList: true, subtree: true });
+    const observer = new MutationObserver(cleanPopups);
 
-    // ⏱️ 方案A：运行 5 分钟（300,000 毫秒）后自动停止监听，彻底释放主线程 CPU 性能
+    const startObserver = () => {
+      observer.observe(document.body, { childList: true, subtree: true });
+    };
+
+    if (document.body) {
+      startObserver();
+    } else {
+      window.addEventListener("DOMContentLoaded", startObserver);
+    }
+
+    // 2 分钟后自动断开，释放 CPU
     setTimeout(() => {
+      cleanPopups.cancel();
       observer.disconnect();
-      console.log(
-        "[自动拦截] 进房初始阶段完成，已自动断开 DOM 监听器以优化性能。",
-      );
-    }, 300000);
+      console.log("[自动拦截] 观察器已销毁，释放主线程。");
+    }, 120000);
   }
 
-  // --- 并行执行任务（界面静态组件隐藏） ---
-
+  // --- 4. UI 元素清理 ---
   async function removeUIElements() {
-    // 1. 初始化自动关闭聊天室
-    waitForElement(".chatroom_close").then(async (btn) => {
+    waitForElement(".chatroom_close", 10000).then(async (btn) => {
       if (btn) {
-        await sleep(1000);
+        await sleep(500);
         btn.click();
         console.log("[成功] 初始化关闭聊天室");
       }
     });
 
-    // 2. 隐藏底部礼物栏  （此项暂保留）
     waitForElement(
       '[data-e2e="gift-panel"], .YWoVbeaa.NP47LiqA.klDKYUkp',
-      30000,
+      10000,
     ).then((bar) => {
       if (bar) {
         bar.style.display = "none";
@@ -167,99 +191,103 @@
     });
   }
 
-  // --- 串行执行任务（按顺序执行悬停交互） ---
-
+  // --- 5. 菜单交互逻辑 (画质/礼物特效/弹幕过滤) ---
   async function handleHoverMenus() {
-    // 1. 切换画质
-    const qualityMenu = await waitForElement('[data-e2e="quality-selector"]');
-    if (qualityMenu) {
-      // 用 data-e2e="quality" 读取当前画质文案
-      const qualityLabel = document.querySelector('[data-e2e="quality"]');
-      const currentQuality = qualityLabel
-        ? qualityLabel.textContent.trim()
-        : "";
+    // 切换原画
+    try {
+      const qualityMenu = await waitForElement(
+        '[data-e2e="quality-selector"]',
+        6000,
+      );
+      if (qualityMenu) {
+        const qualityLabel = document.querySelector('[data-e2e="quality"]');
+        const currentQuality = qualityLabel
+          ? qualityLabel.textContent.trim()
+          : "";
 
-      if (currentQuality === "原画") {
-        console.log("[跳过] 当前画质已经是: 原画");
-      } else {
-        triggerHover(qualityMenu, true);
-        await sleep(500);
+        if (currentQuality !== "原画") {
+          triggerHover(qualityMenu, true);
+          await sleep(300);
 
-        const options = Array.from(
-          qualityMenu.querySelectorAll("li, div, span, p"),
-        );
-        const target = options.find((el) => el.textContent.trim() === "原画");
-        if (target) {
-          target.click();
-          console.log("[成功] 已选择画质: 原画");
+          const options = Array.from(
+            qualityMenu.querySelectorAll("li, div, span, p"),
+          );
+          const target = options.find((el) => el.textContent.includes("原画"));
+          if (target) {
+            target.click();
+            console.log("[成功] 已选择画质: 原画");
+          }
+          triggerHover(qualityMenu, false);
+          await sleep(300);
         }
-        triggerHover(qualityMenu, false);
-        await sleep(500);
       }
+    } catch (err) {
+      console.error("[画质切换异常]:", err);
     }
 
-    // 2. 保持礼物特效为开启状态（如已关闭则打开）
-    const giftPanel = await waitForElement('[data-e2e="gift-setting"]');
-    if (giftPanel) {
-      triggerHover(giftPanel, true);
-      await sleep(800);
+    // 打开-屏蔽礼物特效
+    try {
+      const giftPanel = await waitForElement('[data-e2e="gift-setting"]', 6000);
+      if (giftPanel) {
+        triggerHover(giftPanel, true);
+        await sleep(500);
 
-      const effectTarget =
-        document.querySelector('[data-e2e="effect-switch"] .Cri3cNdU') ||
-        document.querySelector('[data-e2e="effect-switch"] > div');
+        const effectTarget =
+          document.querySelector('[data-e2e="effect-switch"] .Cri3cNdU') ||
+          document.querySelector('[data-e2e="effect-switch"] > div');
 
-      if (effectTarget) {
-        // 检测礼物特效状态：开启状态包含 SpsbqNUm 或 gDrxzyfK class，关闭状态没有
-        const isEnabled =
-          effectTarget.classList.contains("gDrxzyfK") ||
-          effectTarget.parentElement?.classList.contains("SpsbqNUm");
-        if (!isEnabled) {
-          effectTarget.click();
-          console.log("[成功] 已打开礼物特效");
-        } else {
-          console.log("[跳过] 礼物特效已处于开启状态");
-        }
-      } else {
-        console.warn("[失败] 未找到礼物特效开关的内层元素");
-      }
-
-      triggerHover(giftPanel, false);
-      await sleep(800);
-    }
-
-    // 3. 弹幕设置 (送礼信息 + 福袋口令)
-    const danmakuTrigger = await waitForElement(
-      '[data-e2e="danmaku-setting-icon"]',
-    );
-    if (danmakuTrigger) {
-      triggerHover(danmakuTrigger, true);
-      await sleep(800);
-
-      const spans = Array.from(document.querySelectorAll("span"));
-      const types = ["送礼信息", "福袋口令"];
-
-      types.forEach((type) => {
-        const targetSpan = spans.find(
-          (span) => span.textContent.trim() === type,
-        );
-        if (targetSpan && targetSpan.nextElementSibling) {
-          const realSwitch = targetSpan.nextElementSibling.querySelector("div");
-          if (realSwitch) {
-            // 检测开关状态：开启状态包含 SpsbqNUm 或 gDrxzyfK class，关闭状态没有这些 class
-            const isEnabled =
-              realSwitch.classList.contains("SpsbqNUm") ||
-              realSwitch.classList.contains("gDrxzyfK");
-            if (isEnabled) {
-              realSwitch.click();
-              console.log(`[成功] 关闭弹幕选项: ${type}`);
-            } else {
-              console.log(`[跳过] 弹幕选项 ${type} 已处于关闭状态`);
-            }
+        if (effectTarget) {
+          const isEnabled =
+            effectTarget.classList.contains("gDrxzyfK") ||
+            effectTarget.parentElement?.classList.contains("SpsbqNUm");
+          if (!isEnabled) {
+            effectTarget.click();
+            console.log("[成功] 已打开屏蔽礼物特效");
           }
         }
-      });
+        triggerHover(giftPanel, false);
+        await sleep(500);
+      }
+    } catch (err) {
+      console.error("[屏蔽礼物设置异常]:", err);
+    }
 
-      triggerHover(danmakuTrigger, false);
+    // 关闭 送礼信息 + 福袋口令
+    try {
+      const danmakuTrigger = await waitForElement(
+        '[data-e2e="danmaku-setting-icon"]',
+        6000,
+      );
+      if (danmakuTrigger) {
+        triggerHover(danmakuTrigger, true);
+        await sleep(500);
+
+        const spans = Array.from(document.querySelectorAll("span"));
+        const types = ["送礼信息", "福袋口令"];
+
+        types.forEach((type) => {
+          const targetSpan = spans.find((span) =>
+            span.textContent.includes(type),
+          );
+          if (targetSpan && targetSpan.nextElementSibling) {
+            const realSwitch =
+              targetSpan.nextElementSibling.querySelector("div");
+            if (realSwitch) {
+              const isEnabled =
+                realSwitch.classList.contains("SpsbqNUm") ||
+                realSwitch.classList.contains("gDrxzyfK");
+              if (isEnabled) {
+                realSwitch.click();
+                console.log(`[成功] 关闭弹幕选项: ${type}`);
+              }
+            }
+          }
+        });
+
+        triggerHover(danmakuTrigger, false);
+      }
+    } catch (err) {
+      console.error("[弹幕设置异常]:", err);
     }
   }
 
@@ -267,22 +295,16 @@
   async function init() {
     console.log("[抖音直播优化] 脚本开始运行...");
 
-    // 注册键盘切换快捷键
     setupShortcuts();
-
-    // 启用带定时释放功能的安全弹窗/引导拦截机制
+    setupBackgroundRecovery(); // 启用后台切回恢复
     setupPopupCleaner();
-
-    // 并行任务
     removeUIElements();
 
-    // 串行悬停任务
-    await handleHoverMenus();
-
-    console.log("[抖音直播优化] 核心逻辑执行完毕。");
+    handleHoverMenus().then(() => {
+      console.log("[抖音直播优化] 自动化设置处理完毕。");
+    });
   }
 
-  // 启动拦截
   if (
     document.readyState === "complete" ||
     document.readyState === "interactive"
