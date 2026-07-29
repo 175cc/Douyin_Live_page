@@ -1,16 +1,16 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.9.3
-// @description  C键开关聊天室，自动原画，关闭弹幕/礼物，2分钟性能释放，防后台标签页卡顿/黑屏
+// @version      3.9.4
+// @description  快捷键:1.C键开关聊天室;2.空格键:暂停/播放;3.Enter:左下聊天框.功能:自动原画,关闭部分弹幕/礼物……
 // @match        *://live.douyin.com/*
 // @run-at       document-start
 // @grant        none
 // @author       175cc
 // @license      MIT
 // @namespace    https://github.com/175cc/Douyin_Live_page.git
-// @downloadURL  https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%89.user.js
-// @updateURL    https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%89.meta.js
+// @downloadURL  https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%8）user.js
+// @updateURL    https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%8）meta.js
 // ==/UserScript==
 
 (function () {
@@ -52,50 +52,178 @@
     );
   };
 
-  // --- 1. 快捷键功能 (仅保留 C 键 开/关 切换聊天室) ---
-  function setupShortcuts() {
-    document.addEventListener("keydown", (e) => {
-      // 避免输入框打字误触
-      if (
-        ["INPUT", "TEXTAREA"].includes(e.target.tagName) ||
-        e.target.isContentEditable
-      ) {
-        return;
+  // 唤醒底栏并在指定延时后释放悬停 (防黑框与隐藏冲突)
+  const wakeUpAndRelease = (targetEl, delayMs = 500, onFocused) => {
+    if (!targetEl) return;
+
+    const rect = targetEl.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    const opts = {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y,
+    };
+
+    // 1. 触发进入 (Hover in)
+    targetEl.dispatchEvent(new PointerEvent("pointerenter", opts));
+    targetEl.dispatchEvent(new PointerEvent("pointerover", opts));
+    targetEl.dispatchEvent(new PointerEvent("pointermove", opts));
+    targetEl.dispatchEvent(new MouseEvent("mouseenter", opts));
+    targetEl.dispatchEvent(new MouseEvent("mouseover", opts));
+
+    // 2. 延时：等待底栏完全滑出动画完成后聚焦输入框
+    setTimeout(() => {
+      if (typeof onFocused === "function") {
+        onFocused();
       }
 
-      // 监听 C 键 (忽略大小写)
-      if (e.key.toLowerCase() === "c") {
+      // 3. 触发离开 (Hover out) - 释放悬停状态，还给底栏原生隐藏计时器
+      targetEl.dispatchEvent(new PointerEvent("pointerout", opts));
+      targetEl.dispatchEvent(new PointerEvent("pointerleave", opts));
+      targetEl.dispatchEvent(new MouseEvent("mouseout", opts));
+      targetEl.dispatchEvent(new MouseEvent("mouseleave", opts));
+    }, delayMs);
+  };
+
+  // --- 1. 快捷键功能 (C键 开/关 聊天室，空格键 控制播放/暂停，Enter 唤醒输入框) ---
+  function setupShortcuts() {
+    document.addEventListener(
+      "keydown",
+      (e) => {
         if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-        const closeBtn = document.querySelector(".chatroom_close");
-        const openBtn = document.querySelector(".chat_room_fold, .Z6P6fFhc");
+        const textarea = document.querySelector("textarea.sj0L4UzZ");
+        const activeEl = document.activeElement;
 
-        if (closeBtn && closeBtn.offsetParent !== null) {
-          closeBtn.click();
-          console.log("[快捷键 C] 已关闭聊天室");
-        } else if (openBtn) {
-          openBtn.click();
-          console.log("[快捷键 C] 已重新展开聊天室");
-        } else if (closeBtn) {
-          closeBtn.click();
-          console.log("[快捷键 C] 执行关闭聊天室");
+        // ------------------ Enter 键处理逻辑 ------------------
+        if (e.key === "Enter") {
+          const isFocused = textarea && activeEl === textarea;
+
+          // 未聚焦输入框：触发 Enter 唤醒机制
+          if (!isFocused) {
+            // 如果焦点在其他 INPUT 或 ContentEditable 上，不强行夺取
+            if (
+              ["INPUT", "TEXTAREA"].includes(activeEl.tagName) ||
+              activeEl.isContentEditable
+            ) {
+              return;
+            }
+
+            if (!textarea) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 精准抓取播放按钮节点进行 Hover 唤醒
+            const playIcon =
+              document.querySelector(
+                ".douyin-player-icon.douyin-player-play",
+              ) || document.querySelector(".douyin-player-play");
+
+            if (playIcon) {
+              wakeUpAndRelease(playIcon, 500, () => {
+                textarea.focus();
+                console.log("[快捷键 Enter] ✨ 底栏展开完成，已聚焦输入框");
+              });
+            } else {
+              // 降级直接 focus
+              textarea.focus();
+            }
+            return;
+          }
+
+          // 已聚焦输入框：内容为空按 Enter 移出焦点，有内容放行原生发送
+          if (isFocused) {
+            const text = textarea.value.trim();
+            if (text === "") {
+              e.preventDefault();
+              e.stopPropagation();
+              textarea.blur();
+              console.log("[快捷键 Enter] 无内容 -> 移出光标");
+            }
+            return;
+          }
         }
-      }
-    });
+
+        // 避免输入框打字误触其他快捷键 (C键、空格键)
+        if (
+          ["INPUT", "TEXTAREA"].includes(activeEl.tagName) ||
+          activeEl.isContentEditable
+        ) {
+          return;
+        }
+
+        // ------------------ 空格键：控制播放/暂停 ------------------
+        if (e.key === " " || e.code === "Space") {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const btnContainer =
+            document.querySelector('.douyin-player-icon[data-index="0"]') ||
+            document.querySelector(
+              ".douyin-player-controls-left > div:first-child",
+            );
+
+          if (btnContainer) {
+            btnContainer.click();
+          }
+
+          const playerContainer = document.querySelector(".douyin-player");
+          const video = document.querySelector("video");
+
+          if (video) {
+            const isPaused = playerContainer
+              ? playerContainer.classList.contains("douyin-player-pause")
+              : video.paused;
+
+            if (isPaused) {
+              video.play().catch(() => {});
+              console.log("[快捷键 空格] 切换为 -> 播放");
+            } else {
+              video.pause();
+              console.log("[快捷键 空格] 切换为 -> 暂停");
+            }
+          }
+
+          return;
+        }
+
+        // ------------------ C 键：开/关 聊天室 ------------------
+        if (e.key.toLowerCase() === "c") {
+          const closeBtn = document.querySelector(".chatroom_close");
+          const openBtn = document.querySelector(".chat_room_fold, .Z6P6fFhc");
+
+          if (closeBtn && closeBtn.offsetParent !== null) {
+            closeBtn.click();
+            console.log("[快捷键 C] 已关闭聊天室");
+          } else if (openBtn) {
+            openBtn.click();
+            console.log("[快捷键 C] 已重新展开聊天室");
+          } else if (closeBtn) {
+            closeBtn.click();
+            console.log("[快捷键 C] 执行关闭聊天室");
+          }
+        }
+      },
+      true,
+    );
   }
 
-  // --- 2. 切后台防卡顿/黑屏恢复机制 --- 此项待考究 ---
+  // --- 2. 切后台防卡顿/黑屏恢复机制 ---
   function setupBackgroundRecovery() {
     document.addEventListener("visibilitychange", () => {
-      // 当从其他标签页切回抖音直播时
       if (document.visibilityState === "visible") {
         const video = document.querySelector("video");
         if (video) {
-          // 如果视频处于暂停状态且未结束，尝试恢复播放
           if (video.paused && !video.ended) {
             video.play().catch(() => {});
           }
-          // 微调画面渲染，唤醒渲染引擎恢复高帧率
           video.style.transform = "translateZ(0)";
           console.log("[流畅保障] 已从后台切回，唤醒视频渲染层");
         }
@@ -105,29 +233,38 @@
 
   // --- 3. 安全弹窗与引导处理逻辑 ---
   function setupPopupCleaner() {
-    // 安全注入 CSS 隐藏礼物栏与弹窗
+    // 注入全局防闪烁样式
     const injectStyle = () => {
-      const hideStyle = document.createElement("style");
-      hideStyle.textContent = `
-        .dylive-tooltip,
-        [class*="guide-tooltip"],
-        [class*="guideTooltip"],
-        [class*="login-guide-container"],
-        .S_kkDiOx,
-        [data-e2e="gift-panel"],
-        .YWoVbeaa.NP47LiqA.klDKYUkp {
-          display: none !important;
-          visibility: hidden !important;
-          pointer-events: none !important;
-        }
-      `;
-      (document.head || document.documentElement).appendChild(hideStyle);
+      if (document.getElementById("dylive-opt-style")) return true;
+      const targetNode = document.head || document.documentElement;
+      if (targetNode) {
+        const hideStyle = document.createElement("style");
+        hideStyle.id = "dylive-opt-style";
+        hideStyle.textContent = `
+          .dylive-tooltip,
+          [class*="guide-tooltip"],
+          [class*="guideTooltip"],
+          [class*="login-guide-container"],
+          .S_kkDiOx,
+          [data-e2e="gift-panel"],
+          .YWoVbeaa.NP47LiqA.klDKYUkp {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+          }
+        `;
+        targetNode.appendChild(hideStyle);
+        return true;
+      }
+      return false;
     };
 
-    if (document.head || document.documentElement) {
-      injectStyle();
-    } else {
-      document.addEventListener("DOMContentLoaded", injectStyle);
+    // 在 document-start 模式下极速捕获 DOM 并插入 CSS，防止无样式内容闪烁 (FOUC)
+    if (!injectStyle()) {
+      const earlyObserver = new MutationObserver(() => {
+        if (injectStyle()) earlyObserver.disconnect();
+      });
+      earlyObserver.observe(document, { childList: true, subtree: true });
     }
 
     const closeSelectors = [
@@ -162,7 +299,6 @@
       window.addEventListener("DOMContentLoaded", startObserver);
     }
 
-    // 2 分钟后自动断开，释放 CPU
     setTimeout(() => {
       cleanPopups.cancel();
       observer.disconnect();
@@ -193,7 +329,7 @@
 
   // --- 5. 菜单交互逻辑 (画质/礼物特效/弹幕过滤) ---
   async function handleHoverMenus() {
-    // 切换原画
+    // 强制切换为纯“原画”
     try {
       const qualityMenu = await waitForElement(
         '[data-e2e="quality-selector"]',
@@ -207,15 +343,18 @@
 
         if (currentQuality !== "原画") {
           triggerHover(qualityMenu, true);
-          await sleep(300);
+          await sleep(400);
 
           const options = Array.from(
-            qualityMenu.querySelectorAll("li, div, span, p"),
+            qualityMenu.querySelectorAll("div, li, span, p"),
           );
-          const target = options.find((el) => el.textContent.includes("原画"));
+          const target = options.find((el) => el.textContent.trim() === "原画");
+
           if (target) {
             target.click();
-            console.log("[成功] 已选择画质: 原画");
+            console.log(
+              "[成功] 已从 [" + currentQuality + "] 强行选择为: 原画",
+            );
           }
           triggerHover(qualityMenu, false);
           await sleep(300);
@@ -296,7 +435,7 @@
     console.log("[抖音直播优化] 脚本开始运行...");
 
     setupShortcuts();
-    setupBackgroundRecovery(); // 启用后台切回恢复
+    setupBackgroundRecovery();
     setupPopupCleaner();
     removeUIElements();
 
