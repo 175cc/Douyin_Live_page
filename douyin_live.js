@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音直播页面优化（删除底栏礼物，关闭聊天栏，自动原画）
 // @namespace    douyin
-// @version      3.9.4
+// @version      3.9.5
 // @description  快捷键:1.C键开关聊天室;2.空格键:暂停/播放;3.Enter:左下聊天框.功能:自动原画,关闭部分弹幕/礼物……
 // @match        *://live.douyin.com/*
 // @run-at       document-start
@@ -217,16 +217,24 @@
 
   // --- 2. 切后台防卡顿/黑屏恢复机制 ---
   function setupBackgroundRecovery() {
+    let wasPlayingBeforeHidden = false;
+
     document.addEventListener("visibilitychange", () => {
+      const video = document.querySelector("video");
+      if (!video) return;
+
+      if (document.visibilityState === "hidden") {
+        wasPlayingBeforeHidden = !video.paused && !video.ended;
+        return;
+      }
+
       if (document.visibilityState === "visible") {
-        const video = document.querySelector("video");
-        if (video) {
-          if (video.paused && !video.ended) {
-            video.play().catch(() => {});
-          }
-          video.style.transform = "translateZ(0)";
-          console.log("[流畅保障] 已从后台切回，唤醒视频渲染层");
+        if (wasPlayingBeforeHidden && video.paused && !video.ended) {
+          video.play().catch(() => {});
+          console.log("[流畅保障] 仅在前台隐藏前为播放状态时恢复播放");
         }
+        video.style.transform = "translateZ(0)";
+        console.log("[流畅保障] 已从后台切回，唤醒视频渲染层");
       }
     });
   }
