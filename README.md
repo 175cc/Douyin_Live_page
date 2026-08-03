@@ -48,7 +48,8 @@
 
 ## 📁 文件说明
 
-- `douyin_live.js`：脚本主体（唯一需要安装的文件）。
+- `douyin_live.js`：直播页面优化脚本主体（匹配 `https://live.douyin.com/*`）。
+- `douyin-video.js`：短视频网页版精简优化脚本（自改精简版，匹配 `https://www.douyin.com/*`，专注于短视频网页全屏、去冗余元素、自动最高画质等）。
 - `README.md`：本说明文档。
 
 ## 📄 许可

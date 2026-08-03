@@ -9,12 +9,22 @@
 // @author       175cc
 // @license      MIT
 // @namespace    https://github.com/175cc/Douyin_Live_page.git
-// @downloadURL  https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%8）user.js
-// @updateURL    https://update.greasyfork.org/scripts/587525/%E6%8A%96%E9%9F%B3%E7%9B%B4%E6%92%AD%E9%A1%B5%E9%9D%A2%E4%BC%98%E5%8C%96%EF%BC%88%E5%88%A0%E9%99%A4%E5%BA%95%E6%A0%8F%E7%A4%BC%E7%89%A9%EF%BC%8C%E5%85%B3%E9%97%AD%E8%81%8A%E5%A4%A9%E6%A0%8F%EF%BC%8C%E8%87%AA%E5%8A%A8%E5%8E%9F%E7%94%BB%EF%BC%8）meta.js
 // ==/UserScript==
 
 (function () {
   "use strict";
+
+  // 彩色输出配置
+  const colors = {
+    reset: "\x1b[0m",
+    red: "\x1b[31m",
+    green: "\x1b[32m",
+    yellow: "\x1b[33m",
+    blue: "\x1b[34m",
+    cyan: "\x1b[36m",
+  };
+  const cc = (color, ...args) =>
+    console.log(colors[color] + args.join(" ") + colors.reset);
 
   // --- 通用工具函数 ---
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,7 +48,7 @@
       if (el) return el;
       await sleep(400);
     }
-    console.warn(`[未找到/超时] 元素: ${selector}`);
+    cc("red", `[未找到/超时] 元素: ${selector}`);
     return null;
   };
 
@@ -129,7 +139,7 @@
             if (playIcon) {
               wakeUpAndRelease(playIcon, 500, () => {
                 textarea.focus();
-                console.log("[快捷键 Enter] ✨ 底栏展开完成，已聚焦输入框");
+                cc("green", "[快捷键 Enter] ✨ 底栏展开完成，已聚焦输入框");
               });
             } else {
               // 降级直接 focus
@@ -145,7 +155,7 @@
               e.preventDefault();
               e.stopPropagation();
               textarea.blur();
-              console.log("[快捷键 Enter] 无内容 -> 移出光标");
+              cc("blue", "[快捷键 Enter] 无内容 -> 移出光标");
             }
             return;
           }
@@ -184,10 +194,10 @@
 
             if (isPaused) {
               video.play().catch(() => {});
-              console.log("[快捷键 空格] 切换为 -> 播放");
+              cc("green", "[快捷键 空格] 切换为 -> 播放");
             } else {
               video.pause();
-              console.log("[快捷键 空格] 切换为 -> 暂停");
+              cc("yellow", "[快捷键 空格] 切换为 -> 暂停");
             }
           }
 
@@ -201,13 +211,13 @@
 
           if (closeBtn && closeBtn.offsetParent !== null) {
             closeBtn.click();
-            console.log("[快捷键 C] 已关闭聊天室");
+            cc("green", "[快捷键 C] 已关闭聊天室");
           } else if (openBtn) {
             openBtn.click();
-            console.log("[快捷键 C] 已重新展开聊天室");
+            cc("green", "[快捷键 C] 已重新展开聊天室");
           } else if (closeBtn) {
             closeBtn.click();
-            console.log("[快捷键 C] 执行关闭聊天室");
+            cc("blue", "[快捷键 C] 执行关闭聊天室");
           }
         }
       },
@@ -218,6 +228,40 @@
   // --- 2. 切后台防卡顿/黑屏恢复机制 ---
   function setupBackgroundRecovery() {
     let wasPlayingBeforeHidden = false;
+
+    // 检查并点击“继续播放”挂机弹窗的通用函数
+    const checkAndResumeModal = () => {
+      // 可以在小延时后检查，确保 DOM 已完全渲染
+      setTimeout(() => {
+        // 方法1：通过特定类名匹配
+        let resumeBtn =
+          document.querySelector(".elw1KV8O .JL05k7eS.OG51D9OO.NzyTD8Fa") ||
+          document.querySelector(".JL05k7eS.OG51D9OO.NzyTD8Fa") ||
+          document.querySelector(".elw1KV8O div");
+
+        // 方法2：如果没通过类名精确找到，则遍历元素文本内容匹配“继续播放”
+        if (!resumeBtn) {
+          const allDivs = document.querySelectorAll(
+            ".tp31AxZe div, .tPjpbR8_ div, .EiGv3P09 div, .elw1KV8O div, div",
+          );
+          for (const div of allDivs) {
+            if (
+              div.textContent &&
+              div.textContent.trim() === "继续播放" &&
+              div.offsetParent !== null
+            ) {
+              resumeBtn = div;
+              break;
+            }
+          }
+        }
+
+        if (resumeBtn && resumeBtn.offsetParent !== null) {
+          resumeBtn.click();
+          cc("green", "[流畅保障] 检测到挂机暂停弹窗，已自动点击“继续播放”");
+        }
+      }, 600);
+    };
 
     document.addEventListener("visibilitychange", () => {
       const video = document.querySelector("video");
@@ -231,14 +275,16 @@
       if (document.visibilityState === "visible") {
         if (wasPlayingBeforeHidden && video.paused && !video.ended) {
           video.play().catch(() => {});
-          console.log("[流畅保障] 仅在前台隐藏前为播放状态时恢复播放");
+          cc("blue", "[流畅保障] 仅在前台隐藏前为播放状态时恢复播放");
         }
         video.style.transform = "translateZ(0)";
-        console.log("[流畅保障] 已从后台切回，唤醒视频渲染层");
+        cc("cyan", "[流畅保障] 已从后台切回，唤醒视频渲染层");
+
+        // 切回前台时检测并处理挂机暂停弹窗
+        checkAndResumeModal();
       }
     });
   }
-
   // --- 3. 安全弹窗与引导处理逻辑 ---
   function setupPopupCleaner() {
     // 注入全局防闪烁样式
@@ -310,7 +356,7 @@
     setTimeout(() => {
       cleanPopups.cancel();
       observer.disconnect();
-      console.log("[自动拦截] 观察器已销毁，释放主线程。");
+      cc("yellow", "[自动拦截] 观察器已销毁，释放主线程。");
     }, 120000);
   }
 
@@ -320,7 +366,7 @@
       if (btn) {
         await sleep(500);
         btn.click();
-        console.log("[成功] 初始化关闭聊天室");
+        cc("green", "[成功] 初始化关闭聊天室");
       }
     });
 
@@ -330,7 +376,7 @@
     ).then((bar) => {
       if (bar) {
         bar.style.display = "none";
-        console.log("[成功] 隐藏礼物栏");
+        cc("green", "[成功] 隐藏礼物栏");
       }
     });
   }
@@ -360,7 +406,8 @@
 
           if (target) {
             target.click();
-            console.log(
+            cc(
+              "green",
               "[成功] 已从 [" + currentQuality + "] 强行选择为: 原画",
             );
           }
@@ -369,7 +416,7 @@
         }
       }
     } catch (err) {
-      console.error("[画质切换异常]:", err);
+      cc("red", "[画质切换异常]:", err);
     }
 
     // 打开-屏蔽礼物特效
@@ -389,14 +436,14 @@
             effectTarget.parentElement?.classList.contains("SpsbqNUm");
           if (!isEnabled) {
             effectTarget.click();
-            console.log("[成功] 已打开屏蔽礼物特效");
+            cc("green", "[成功] 已打开屏蔽礼物特效");
           }
         }
         triggerHover(giftPanel, false);
         await sleep(500);
       }
     } catch (err) {
-      console.error("[屏蔽礼物设置异常]:", err);
+      cc("red", "[屏蔽礼物设置异常]:", err);
     }
 
     // 关闭 送礼信息 + 福袋口令
@@ -425,7 +472,7 @@
                 realSwitch.classList.contains("gDrxzyfK");
               if (isEnabled) {
                 realSwitch.click();
-                console.log(`[成功] 关闭弹幕选项: ${type}`);
+                cc("green", `[成功] 关闭弹幕选项: ${type}`);
               }
             }
           }
@@ -434,13 +481,13 @@
         triggerHover(danmakuTrigger, false);
       }
     } catch (err) {
-      console.error("[弹幕设置异常]:", err);
+      cc("red", "[弹幕设置异常]:", err);
     }
   }
 
   // ================== 主执行逻辑 ==================
   async function init() {
-    console.log("[抖音直播优化] 脚本开始运行...");
+    cc("cyan", "[抖音直播优化] 脚本开始运行...");
 
     setupShortcuts();
     setupBackgroundRecovery();
@@ -448,7 +495,7 @@
     removeUIElements();
 
     handleHoverMenus().then(() => {
-      console.log("[抖音直播优化] 自动化设置处理完毕。");
+      cc("green", "[抖音直播优化] 自动化设置处理完毕。");
     });
   }
 
