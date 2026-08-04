@@ -1,24 +1,18 @@
 // ==UserScript==
-// @name 抖音网页版优化（自改精简版）
-// @description 抖音网页版推荐、直播优化，网页全屏，全黑，自动按浏览器窗口调整大小
-// @namespace https://space.bilibili.com/482343
-// @author 古海沉舟
-// @license 古海沉舟
-// @version 1.2
-// @match https://www.douyin.com/*
-// @require https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js
-// @require https://cdn.jsdelivr.net/npm/howler@2.2.4/dist/howler.min.js
-// @run-at document-end
-// @grant GM_setValue
-// @grant GM_getValue
-// @grant GM_addValueChangeListener
-// @grant window.close
+// @name         抖音精选视频（自改精简版）
+// @namespace    douyin
+// @description  仅适用精选版抖音网页版，专注于视频播放和浏览体验（部分代码取自其他脚本）
+// @version      1.2
+// @match        *://www.douyin.com/*
+// @require      https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js
+// @run-at       document-end
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_addValueChangeListener
+// @grant        window.close
+// @license      MIT
 // @noframes
-// @downloadURL https://update.greasyfork.org/scripts/434956/%E6%8A%96%E9%9F%B3%E7%BD%91%E9%A1%B5%E7%89%88%E4%BC%98%E5%8C%96.user.js
-// @updateURL https://update.greasyfork.org/scripts/434956/%E6%8A%96%E9%9F%B3%E7%BD%91%E9%A1%B5%E7%89%88%E4%BC%98%E5%8C%96.meta.js
 // ==/UserScript==
-// 版本说明：上述信息是原作者的，点击直达。我提取了部分代码；
-//     ：仅适用精选版抖音网页版，去掉了直播界面和其他不必要的功能，专注于视频播放和浏览体验。
 
 // 全局控制变量
 var bs = null;
@@ -227,7 +221,7 @@ function initUrlDetection() {
 // 脚本入口
 $(document).ready(function () {
   setTimeout(function () {
-    cc("magenta", "=== 抖音精简版优化脚本启动 ===");
+    cc("magenta", "=== 抖音精选视频脚本启动 ===");
     initUrlDetection();
     initializeScript();
   }, 2000);
