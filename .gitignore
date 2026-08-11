@@ -1,0 +1,10 @@
+# Ignore local continuation folder created by some tools
+.continue/
+
+# Ignore local test file
+test.js
+
+# Node and build artifacts (common)
+node_modules/
+dist/
+*.log
