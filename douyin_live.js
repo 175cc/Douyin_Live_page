@@ -421,14 +421,20 @@
 
     // 打开-屏蔽礼物特效
     try {
-      const giftPanel = await waitForElement('[data-e2e="gift-setting"]', 6000);
+      const giftPanel = await waitForElement('[data-e2e="gift-setting"]', 8000);
       if (giftPanel) {
         triggerHover(giftPanel, true);
-        await sleep(500);
 
-        const effectTarget =
-          document.querySelector('[data-e2e="effect-switch"] .Cri3cNdU') ||
-          document.querySelector('[data-e2e="effect-switch"] > div');
+        // 轮询等待设置开关元素挂载（解决 F5 刷新过快时菜单未及时渲染问题）
+        let effectTarget = null;
+        const startTime = Date.now();
+        while (Date.now() - startTime < 3000) {
+          effectTarget =
+            document.querySelector('[data-e2e="effect-switch"] .Cri3cNdU') ||
+            document.querySelector('[data-e2e="effect-switch"] > div');
+          if (effectTarget) break;
+          await sleep(200);
+        }
 
         if (effectTarget) {
           const isEnabled =
@@ -438,9 +444,11 @@
             effectTarget.click();
             cc("green", "[成功] 已打开屏蔽礼物特效");
           }
+        } else {
+          cc("yellow", "[提示] 屏蔽礼物特效菜单未在预期时间内渲染");
         }
         triggerHover(giftPanel, false);
-        await sleep(500);
+        await sleep(300);
       }
     } catch (err) {
       cc("red", "[屏蔽礼物设置异常]:", err);
