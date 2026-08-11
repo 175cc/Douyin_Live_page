@@ -49,9 +49,9 @@
 ## 📁 文件说明
 
 - `douyin_live.js`：直播页面优化脚本主体（匹配 `https://live.douyin.com/*`）。
-- `douyon_fudai.js`：抖音直播自动抢福袋助手（匹配 `https://live.douyin.com/*`，`Ctrl + Q` 开关，详细说明见 [douyon_fudai.md](./douyon_fudai.md)）。
+- `douyin_fudai.js`：抖音直播自动抢福袋助手（匹配 `https://live.douyin.com/*`，`Ctrl + Q` 开关，详细说明见 [douyin_fudai.md](./douyin_fudai.md)）。
 - `douyin-video.js`：短视频网页版精简优化脚本（自改精简版，匹配 `https://www.douyin.com/*`，专注于短视频网页全屏、去冗余元素、自动最高画质等）。
-- `douyon_fudai.md`：抢福袋助手脚本的专属使用/维护文档。
+- `douyin_fudai.md`：抢福袋助手脚本的专属使用/维护文档。
 - `README.md`：本说明文档。
 
 ## 📄 许可

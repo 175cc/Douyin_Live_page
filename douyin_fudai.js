@@ -2,7 +2,7 @@
 // @name         抖音福袋自动抢
 // @namespace    douyin
 // @version      1.0.0
-// @description  抖音直播自动识别福袋、检查条件、参与、倒计时与开奖结果检测（快捷键 Ctrl + Q 开启/关闭）
+// @description  抖音直播自动识别福袋、检查条件、参与1、倒计时与开奖结果检测（快捷键 Ctrl + Q 开启/关闭）
 // @match        *://live.douyin.com/*
 // @run-at       document-idle
 // @grant        none
