@@ -1,5 +1,6 @@
 # Ignore local continuation folder created by some tools
 .continue/
+.vscode/
 
 # Ignore local test file
 test.js
