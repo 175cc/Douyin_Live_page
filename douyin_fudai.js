@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音福袋自动抢
 // @namespace    douyin
-// @version      1.0.0
+// @version      1.0.1
 // @description  抖音直播自动识别福袋、检查条件、参与1、倒计时与开奖结果检测（快捷键 Ctrl + Q 开启/关闭）
 // @match        *://live.douyin.com/*
 // @run-at       document-idle
@@ -43,6 +43,7 @@
   let currentActionState = "NONE"; // "NONE" | "JOINED" | "ABANDONED"// 当前轮次的操作状态
   let cachedRemainingSeconds = 999; // 缓存的剩余秒数，用于倒计时显示
   let lastRoundResult = null; // 上一轮的开奖结果信息，{ text: string, status: "中奖" | "未中奖" | "未知" }
+  let currentLotteryCount = null; // 当前福袋总数量，未知时为 null
 
   const IDLE_POLL_INTERVAL = 60000; // 60秒轮询一次，降低 CPU 占用
   const ACTIVE_POLL_INTERVAL = 1000; // 1秒轮询一次，快速响应福袋出现和倒计时
@@ -81,6 +82,8 @@
     hasJoinedThisRound = false;
     currentActionState = "NONE";
     cachedRemainingSeconds = 999;
+    currentLotteryCount = null;
+    updateLotteryCountDisplay();
     stopCountdownTimer();
     if (abandonTimeoutTimer) {
       clearTimeout(abandonTimeoutTimer);
@@ -131,6 +134,40 @@
       return true;
     }
     return false;
+  };
+
+  // 从当前福袋弹窗结构中读取数量：未参与使用 Y76xf_k0，已参与使用 T6zCkci7。
+  const getLotteryCount = (container) => {
+    if (!container) return null;
+
+    const countEl = container.querySelector(
+      ".Y76xf_k0, [class*='Y76xf_k0'], .T6zCkci7, [class*='T6zCkci7']",
+    );
+    if (!countEl) return null;
+
+    const countText = countEl.textContent.trim();
+    const countMatch = countText.match(/(?:共|有)?\s*(\d+)\s*个福袋/);
+    if (countMatch) return Number(countMatch[1]);
+
+    const numberMatch = countText.match(/\d+/);
+    if (numberMatch) return Number(numberMatch[0]);
+
+    const chineseCount = countText.match(/[一二两三四五六七八九十]+/);
+    if (!chineseCount) return null;
+    const chineseDigits = {
+      一: 1,
+      二: 2,
+      两: 2,
+      三: 3,
+      四: 4,
+      五: 5,
+      六: 6,
+      七: 7,
+      八: 8,
+      九: 9,
+      十: 10,
+    };
+    return chineseDigits[chineseCount[0]] || null;
   };
 
   // --- 5. 开奖检测逻辑 ---
@@ -190,21 +227,38 @@
   };
 
   // --- 6. 条件解析与判定 ---
-  const getLotteryConditionsInfo = () => {
-    const conditionTitle = $byText("div", "参与条件");
+  const getLotteryConditionsInfo = (dialogContainer) => {
+    const lotteryCount = getLotteryCount(dialogContainer);
+    const conditionTitle = dialogContainer
+      ? Array.from(dialogContainer.querySelectorAll("div")).find(
+          (el) => el.textContent.trim() === "参与条件",
+        )
+      : $byText("div", "参与条件");
     if (!conditionTitle) {
-      return { hasConditions: false, conditions: [], formattedText: "" };
+      return {
+        hasConditions: false,
+        conditions: [],
+        formattedText: "",
+        lotteryCount,
+      };
     }
 
-    const container =
+    const conditionContainer =
       conditionTitle.closest(
         "[class*='dialog'], [class*='container'], [class*='content']",
       ) || conditionTitle.parentElement;
-    if (!container) {
-      return { hasConditions: false, conditions: [], formattedText: "" };
+    if (!conditionContainer) {
+      return {
+        hasConditions: false,
+        conditions: [],
+        formattedText: "",
+        lotteryCount,
+      };
     }
 
-    const requirementEls = container.querySelectorAll(SELECTORS.reqItem);
+    const requirementEls = conditionContainer.querySelectorAll(
+      SELECTORS.reqItem,
+    );
     const conditions = Array.from(requirementEls)
       .map((reqEl) => {
         const requirement = reqEl.textContent.trim();
@@ -220,7 +274,7 @@
 
     // Fallback 解析
     if (conditions.length === 0) {
-      const allDivs = Array.from(container.querySelectorAll("div"));
+      const allDivs = Array.from(conditionContainer.querySelectorAll("div"));
       for (let i = 0; i < allDivs.length - 1; i++) {
         const reqText = allDivs[i].textContent.trim();
         const statusText = allDivs[i + 1].textContent.trim();
@@ -233,7 +287,12 @@
     }
 
     if (conditions.length === 0) {
-      return { hasConditions: false, conditions: [], formattedText: "" };
+      return {
+        hasConditions: false,
+        conditions: [],
+        formattedText: "",
+        lotteryCount,
+      };
     }
 
     const isSingle = conditions.length === 1;
@@ -242,7 +301,13 @@
       `${summaryPrefix}: ` +
       conditions.map((c) => `${c.requirement}[${c.status}]`).join(" | ");
 
-    return { hasConditions: true, conditions, isSingle, formattedText };
+    return {
+      hasConditions: true,
+      conditions,
+      isSingle,
+      formattedText,
+      lotteryCount,
+    };
   };
 
   // --- 7. 主任务入口 ---
@@ -283,9 +348,15 @@
     // 2. 检查福袋详情弹窗
     const dialogContainer = $(SELECTORS.dialogContainer);
     const alreadyJoinedBtn =
-      $(SELECTORS.alreadyJoinedBtn) || $byText("div", "已参与");
+      dialogContainer?.querySelector(SELECTORS.alreadyJoinedBtn) ||
+      (dialogContainer ? $byText("div", "已参与") : null);
     const joinBtn =
-      $(SELECTORS.joinBtn) || $byText("div", "一键发评论参与福袋", false);
+      dialogContainer?.querySelector(SELECTORS.joinBtn) ||
+      (dialogContainer
+        ? Array.from(dialogContainer.querySelectorAll("div")).find((el) =>
+            el.textContent.includes("一键发评论参与福袋"),
+          )
+        : null);
 
     const timerEl = $(SELECTORS.timer);
     const timerText = timerEl ? timerEl.textContent.trim() : "";
@@ -294,7 +365,9 @@
 
     // --- 逻辑 A：弹窗当前处于展开状态 ---
     if (dialogContainer) {
-      const conditionsInfo = getLotteryConditionsInfo();
+      const conditionsInfo = getLotteryConditionsInfo(dialogContainer);
+      currentLotteryCount = conditionsInfo.lotteryCount;
+      updateLotteryCountDisplay();
       if (conditionsInfo.hasConditions) {
         console.log("📝 [自动抢福袋] 参与条件：", conditionsInfo.formattedText);
         updateConditionsDisplay(conditionsInfo);
@@ -557,6 +630,18 @@
     loopTimer = setInterval(runLotteryTask, ms);
   };
 
+  const updateLotteryCountDisplay = () => {
+    const countEl = document.getElementById("lottery-count-text");
+    if (!countEl) return;
+
+    countEl.innerText =
+      Number.isInteger(currentLotteryCount) && currentLotteryCount >= 0
+        ? `（${currentLotteryCount}个）`
+        : "（未知）";
+    countEl.title =
+      currentLotteryCount == null ? "福袋数量未知" : "当前福袋总数量";
+  };
+
   const updatePanelStatus = (msg) => {
     const statusEl = document.getElementById("lottery-status-text");
     if (statusEl) statusEl.innerText = msg;
@@ -675,13 +760,14 @@
           transition: background 0.2s;
         ">福袋功能：已关闭 (Ctrl+Q)</button>
         <div style="font-size: 10px; opacity: 0.85; text-align: center;">
-          状态: <span id="lottery-status-text">已关闭</span>
+          状态: <span id="lottery-status-text">已关闭</span><span id="lottery-count-text" style="display: inline-block; margin-left: 4px; padding: 0 3px; border: 1px solid #ffd54f; border-radius: 2px; color: #ffd54f; font-weight: bold;" title="福袋数量未知">（未知）</span>
         </div>
       </div>
       <div id="lottery-conditions-text" title="" style="font-size: 10px; opacity: 0.85; text-align: center; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 1px solid rgba(255,255,255,0.2); padding-left: 6px; margin-left: 2px;"></div>
     `;
 
     document.body.appendChild(panel);
+    updateLotteryCountDisplay();
     makeDraggable(panel, panel);
     document
       .getElementById("lottery-toggle-btn")
